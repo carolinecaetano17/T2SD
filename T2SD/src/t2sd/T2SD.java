@@ -11,20 +11,12 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.util.ArrayList;
 
-/**
- *
- * @author Carol pc
- */
 public class T2SD {
 
-    /**
-     * @param args the command line arguments
-     */
-     //Define the number of threads
-    private final static int THREAD_NUMBER = 2;
+    //Define the number of threads
+    private final static int THREAD_NUMBER = 5;
     
     public static void main(String[] args) {
-        // TODO code application logic here
      
         ArrayList<SDThread> threadPool = new ArrayList<SDThread>();
         ArrayList<DatagramSocket> socketList = new ArrayList<DatagramSocket>();
@@ -33,7 +25,7 @@ public class T2SD {
         for (int i = 0; i < THREAD_NUMBER; i++) {
             try {
                 //Bind the socket with the local address, set port and timeout
-                InetAddress addr = InetAddress.getByName("127.0.0.1");
+                InetAddress addr = InetAddress.getByName("localhost");
                 DatagramSocket s = new DatagramSocket(20000 + i, addr);
                 s.setSoTimeout(5000);
                 socketList.add(i, s);
@@ -44,7 +36,7 @@ public class T2SD {
 
         //Create threads
         for (int i = 0; i < THREAD_NUMBER; i++) {
-            SDThread t = new SDThread(i, socketList,true,"main");
+            SDThread t = new SDThread(i, socketList, true);
             threadPool.add(t);
         }
 
