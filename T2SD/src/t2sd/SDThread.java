@@ -49,7 +49,7 @@ public class SDThread extends Thread{
     }
     
     
-    
+    //Getter and Setter for the Critical Zone variables
     public synchronized void setCriticalZone(boolean value){
         criticalZones[this.pID] = value;
     }
@@ -58,7 +58,7 @@ public class SDThread extends Thread{
         return criticalZones[this.pID];
     }
     
-    //Send a multicast message from the current socket
+    //Send a multicast message from the current socket who wants the resource
     public void send(String message) {
 
         //New event, increment sequence number
@@ -84,7 +84,14 @@ public class SDThread extends Thread{
         }
     }
     
-    //Send an acknowledgement of the message and update the message list
+    /*  Check if the current Thread is using or wants the resource if not
+        send an ACK.
+        If it is using put the puts the Thread in a list to send ACK when 
+        it finishes
+        If it wants the resource the lower mID between the current message and
+        its own message gets the resource
+        
+    */
     private List<Pair<String, Integer>> receive(Pair message, List<Pair<String, Integer>> messageList) {
 
         //Message received, adjust clock the following way:
@@ -104,9 +111,10 @@ public class SDThread extends Thread{
         messageList.add(message);
         Collections.sort(messageList, mIDComparator);
         
-       /* if(!this.wants && !this.criticalZone){
-            //Thread does not want the resource, so it sends an ACK
-            
+        if(!this.wants && !getCriticalZone()){
+            /*  Thread does not want the resource, neither it is using so 
+                it sends an ACK
+            */
             try {
                 s.send(new DatagramPacket(serialize(ackMessage), serialize(ackMessage).length,
                         s.getLocalAddress(), s.getLocalPort()));
@@ -114,14 +122,36 @@ public class SDThread extends Thread{
                 System.out.println("Log: Error sending ACK, from thread " + pID + " to " + tID);
             }
         }
-        else if( this.wants == true){
-            /*The thread wants the resource, then it checks the clock
-              If the message has a lower clock than its own message send an ACK
-            /
+        else if( this.wants ){
+            /*  The thread wants the resource, then it checks the clock
+                If the message has a lower clock than its own message send an ACK
+            */
+            
+            for (int i = 0; i < messageList.size(); i++) {
+                if ( Integer.parseInt(messageList.get(i).getmID()) % 10 == pID) {
+                    if ((Integer) message.getQnt() < Integer.parseInt(messageList.get(i).getmID())) {
+                        /*  If the mID receives is lower then its own message 
+                            send an ACK
+                        */
+                        try {
+                            s.send(new DatagramPacket(serialize(ackMessage), serialize(ackMessage).length,
+                                    s.getLocalAddress(), s.getLocalPort()));
+                        } catch (IOException e) {
+                            System.out.println("Log: Error sending ACK, from thread " + pID + " to " + tID);
+                        }
+                        break;
+                    }else{
+                        //Not sure
+                    }
+                }
+            }
+            
         }else{
-            //The thread is in the critical zone, it's using the resource
+            /*  The thread is in the critical zone, it's using the resource 
+                the message goes to a list to receive an ACK 
+            */
         
-        }*/
+        }
         return messageList;
     }
     
@@ -149,9 +179,8 @@ public class SDThread extends Thread{
                       So create a new thread with the same ID to use the Resource
                       while the original thread keep running normally
                     */
-                    //SDThread auxT = new SDThread(this.pID);
-                    //auxT.runThread();
-                
+                    SDThread auxT = new SDThread(this.pID,"aux");
+                    auxT.start();
                 }
                 return ackList;
             }
@@ -193,13 +222,13 @@ public class SDThread extends Thread{
             int totalMessagesToSend = 3;
             int messagesSent = 0;
             byte[] data = new byte[10000000];
-            SDThread auxT = new SDThread(this.pID,"aux");
-            auxT.start();
+            
             //Create the packet to be sent
             DatagramPacket packet = new DatagramPacket(data, 10000000);
             /*for(int i = 0 ; i < 100 ; i++){
                 System.out.println("Hi");
             }*/
+            
         }else if(this.type.equals("aux")){
             useResource();
             /*for(int i = 0 ; i < 100 ; i++){
