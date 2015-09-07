@@ -25,20 +25,37 @@ public class SDThread extends Thread{
     //Only one number generator for all threads
     private static Random r = new Random();
     private int timeToSleep;
-    
+    private String type;
     //Flow control variables
     private boolean wants;
-    private boolean criticalZone; 
+    private static boolean[] criticalZones; 
+    
+    public SDThread(int pID, String type){
+        this.pID = pID;
+        this.timeToSleep = 3000;
+        this.type = type;
+    }
     
     //Initialize the thread with the given information
-    public SDThread(int pID, List<DatagramSocket> clientList, boolean wantsIt) {
+    public SDThread(int pID, List<DatagramSocket> clientList, boolean wantsIt,String type) {
         this.clientList = clientList;
         //Start the sequence number at different places for different threads
         this.sequenceNumber = r.nextInt(4);
         this.pID = pID;
         this.wants = wantsIt;
-        this.criticalZone = false; 
+        criticalZones =  new boolean[clientList.size()];
         this.timeToSleep = 3000;
+        this.type = type;
+    }
+    
+    
+    
+    public synchronized void setCriticalZone(boolean value){
+        criticalZones[this.pID] = value;
+    }
+    
+    public synchronized boolean getCriticalZone(){
+        return criticalZones[this.pID];
     }
     
     //Send a multicast message from the current socket
@@ -87,7 +104,7 @@ public class SDThread extends Thread{
         messageList.add(message);
         Collections.sort(messageList, mIDComparator);
         
-        if(!this.wants && !this.criticalZone){
+       /* if(!this.wants && !this.criticalZone){
             //Thread does not want the resource, so it sends an ACK
             
             try {
@@ -100,11 +117,11 @@ public class SDThread extends Thread{
         else if( this.wants == true){
             /*The thread wants the resource, then it checks the clock
               If the message has a lower clock than its own message send an ACK
-            */
+            /
         }else{
             //The thread is in the critical zone, it's using the resource
         
-        }
+        }*/
         return messageList;
     }
     
@@ -128,8 +145,12 @@ public class SDThread extends Thread{
                 Collections.sort(ackList, ackComparator);
                 
                 if(ack.getQnt() == clientList.size() - 1){
-                    //It means this thread can use the resource
-                    this.useResource();
+                    /*It means this thread can use the resource
+                      So create a new thread with the same ID to use the Resource
+                      while the original thread keep running normally
+                    */
+                    //SDThread auxT = new SDThread(this.pID);
+                    //auxT.runThread();
                 
                 }
                 return ackList;
@@ -144,7 +165,7 @@ public class SDThread extends Thread{
     
     public void useResource(){
         
-        this.criticalZone = true;
+        setCriticalZone(true);
         
         try {
             Thread.sleep(this.timeToSleep);
@@ -152,30 +173,41 @@ public class SDThread extends Thread{
             Logger.getLogger(SDThread.class.getName()).log(Level.SEVERE, null, ex);
         }
         
-        this.criticalZone = false;
+        setCriticalZone(false);
         this.wants = false;
-    
+  
     }
     
     public void run(){
         
-        //Keep track of every message received
-        List<Pair<String, Integer>> messageList = new ArrayList<Pair<String, Integer>>();
+        if (this.type.equals("main")){
+            //Keep track of every message received
+            List<Pair<String, Integer>> messageList = new ArrayList<Pair<String, Integer>>();
 
-        //Keep track of each message's ack quantity
-        List<Pair<String, Integer>> ackList = new ArrayList<Pair<String, Integer>>();
+            //Keep track of each message's ack quantity
+            List<Pair<String, Integer>> ackList = new ArrayList<Pair<String, Integer>>();
 
 
-        //Variables to keep track of the thread progress
-        int messagesReceived = 0;
-        int totalMessagesToSend = 3;
-        int messagesSent = 0;
-        byte[] data = new byte[10000000];
-
-        //Create the packet to be sent
-        DatagramPacket packet = new DatagramPacket(data, 10000000);
-    
+            //Variables to keep track of the thread progress
+            int messagesReceived = 0;
+            int totalMessagesToSend = 3;
+            int messagesSent = 0;
+            byte[] data = new byte[10000000];
+            SDThread auxT = new SDThread(this.pID,"aux");
+            auxT.start();
+            //Create the packet to be sent
+            DatagramPacket packet = new DatagramPacket(data, 10000000);
+            /*for(int i = 0 ; i < 100 ; i++){
+                System.out.println("Hi");
+            }*/
+        }else if(this.type.equals("aux")){
+            useResource();
+            /*for(int i = 0 ; i < 100 ; i++){
+                System.out.println("Hi2");
+            }*/
+        }
     }
+    
     
     //Compare Messages for sorting
     public static Comparator<Pair<String, Integer>> mIDComparator = new Comparator<Pair<String, Integer>>() {

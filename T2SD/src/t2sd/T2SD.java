@@ -21,7 +21,7 @@ public class T2SD {
      * @param args the command line arguments
      */
      //Define the number of threads
-    private final static int THREAD_NUMBER = 5;
+    private final static int THREAD_NUMBER = 2;
     
     public static void main(String[] args) {
         // TODO code application logic here
@@ -44,7 +44,7 @@ public class T2SD {
 
         //Create threads
         for (int i = 0; i < THREAD_NUMBER; i++) {
-            SDThread t = new SDThread(i, socketList,true);
+            SDThread t = new SDThread(i, socketList,true,"main");
             threadPool.add(t);
         }
 
