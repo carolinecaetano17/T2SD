@@ -53,7 +53,7 @@ public class SDThread extends Thread {
         Pair<String, Integer> outMessage = new Pair<String, Integer>(message, mID);
 
         //Store own message in the list and reorder it (to keep track of ACK messages)
-        if (message.equals("USE")) {
+        if (!message.equals("ACK")) {
             messageList.add(outMessage);
             Collections.sort(messageList, mIDComparator);
         }
@@ -202,26 +202,32 @@ public class SDThread extends Thread {
 
     public void run() {
 
-            //Keep track of every message received
-            List<Pair<String, Integer>> messageList = new ArrayList<Pair<String, Integer>>();
+        //Keep track of every message received
+        List<Pair<String, Integer>> messageList = new ArrayList<Pair<String, Integer>>();
 
         //Keep track of own message's ack quantity
         Pair<String, Integer> threadAcks = null;
 
-            //Variables to keep track of the thread progress
-            int messagesReceived = 0;
+        //Variables to keep track of the thread progress
+        int messagesReceived = 0;
         int totalMessagesToSend = 1;
-            int messagesSent = 0;
-            byte[] data = new byte[10000000];
+        int messagesSent = 0;
+        byte[] data = new byte[10000000];
 
         //Create the packet to be used to receive data
-            DatagramPacket packet = new DatagramPacket(data, 10000000);
-
+        DatagramPacket packet = new DatagramPacket(data, 10000000);
+        
+        //Name of the file that will be used as Resource
+        String fileName = "output.txt";
+        
         while (true) {
 
-            //If we have already sent and received every message we are done
-            //Rationale: clientList - 1 ACKs per message +
-            //           clientList messages received from each thread (including itself)
+            /*  If we have already sent and received every message we are done
+                Rationale: clientList - 1 ACKs per message +
+                clientList messages received from each thread (including itself)
+                In this implementation we simulate that all the Threads wants 
+                the Resource.
+            */        
             if (messagesReceived == (totalMessagesToSend * (clientList.size() - 1)) +
                     totalMessagesToSend * clientList.size()) {
                 clientList.get(pID).close();
@@ -230,7 +236,7 @@ public class SDThread extends Thread {
 
             //Send a message and update the quantity of messages sent by this thread
             if (messagesSent < totalMessagesToSend) {
-                send("USE", messageList);
+                send(fileName, messageList);
                 messagesSent++;
             }
 
