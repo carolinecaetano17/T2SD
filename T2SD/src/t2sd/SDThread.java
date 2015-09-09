@@ -74,13 +74,13 @@ public class SDThread extends Thread {
     }
 
     /*  Check if the current Thread is using or wants the resource. If not,
-        send an ACK.
-        If it is using puts the Thread in a list to send ACK when
-        it finishes
-        If it wants the resource the lower mID between the current message and
-        its own message gets the resource
+     send an ACK.
+     If it is using puts the Thread in a list to send ACK when
+     it finishes
+     If it wants the resource the lower mID between the current message and
+     its own message gets the resource
         
-    */
+     */
     private List<Pair<String, Integer>> receive(Pair message, List<Pair<String, Integer>> messageList) {
 
         //Message received, adjust clock the following way:
@@ -100,8 +100,8 @@ public class SDThread extends Thread {
 
         if (!this.wants && !getCriticalZone()) {
             /*  Thread does not want the resource, neither is it using so
-                it sends an ACK
-            */
+             it sends an ACK
+             */
             try {
                 s.send(new DatagramPacket(serialize(ackMessage), serialize(ackMessage).length,
                         s.getLocalAddress(), s.getLocalPort()));
@@ -110,14 +110,14 @@ public class SDThread extends Thread {
             }
         } else if (this.wants) {
             /*  The thread wants the resource, then it checks the clock
-                If the message has a lower clock than its own message send an ACK
-            */
+             If the message has a lower clock than its own message send an ACK
+             */
             for (int i = 0; i < messageList.size(); i++) {
                 if (messageList.get(i).getmID() % TOTAL_ORDER_MULTIPLIER == pID) {
                     if ((Integer) message.getmID() < (Integer) messageList.get(i).getmID()) {
                         /*  If the mID received is lower than its own message
-                            send an ACK
-                        */
+                         send an ACK
+                         */
                         try {
                             s.send(new DatagramPacket(serialize(ackMessage), serialize(ackMessage).length,
                                     s.getLocalAddress(), s.getLocalPort()));
@@ -126,9 +126,9 @@ public class SDThread extends Thread {
                         }
                     } else {
                         /* Thread wants the resource and has a lower logical clock.
-                           We insert the message into the list of messages that want to use the
-                           resource. When we are done, we send an ack to the first message in this list
-                        */
+                         We insert the message into the list of messages that want to use the
+                         resource. When we are done, we send an ack to the first message in this list
+                         */
 
                         //Insert the message in the list and reorder it
                         messageList.add(message);
@@ -139,8 +139,8 @@ public class SDThread extends Thread {
 
         } else {
             /*  The thread is in the critical zone, it's using the resource.
-                The message goes to a list to receive an ACK. Same as above.
-            */
+             The message goes to a list to receive an ACK. Same as above.
+             */
             //Insert the message in the list and reorder it
             messageList.add(message);
             Collections.sort(messageList, mIDComparator);
@@ -150,7 +150,7 @@ public class SDThread extends Thread {
     }
 
     //Processes ack messages
-    private Pair<String, Integer> ack(Pair message, Pair<String, Integer> threadAck) {
+    private Pair<String, Integer> ack(Pair message, Pair<String, Integer> threadAck, List<Pair<String, Integer>> messageList) {
 
         //Message received, adjust clock the same way as receive()
         sequenceNumber = 1 + Math.max(sequenceNumber * TOTAL_ORDER_MULTIPLIER + pID, ((int) message.getmID()));
@@ -160,22 +160,26 @@ public class SDThread extends Thread {
             threadAck.setmID(threadAck.getmID() + 1);
             if (threadAck.getmID() == clientList.size() - 1) {
                 /*It means this thread can use the resource
-                  So create a new thread with the same ID to use the Resource
-                  while the original thread keep running normally
-                */
-                System.out.println("Thread " + pID + " preparing to enter critical zone");
-                setCriticalZone(true);
-                System.out.println("Thread " + this.pID + " in critical zone");
-                try {
-                    this.sleep(this.timeToSleep);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                System.out.println("Thread " + this.pID + " leaving critical zone after " + this.timeToSleep + "ms");
-                setCriticalZone(false);
-                this.wants = false;
+                 So create a new thread with the same ID to use the Resource
+                 while the original thread keep running normally
+                 */
+                useResource(messageList);
+                /*
+                 System.out.println("Thread " + pID + " preparing to enter critical zone");
+                 setCriticalZone(true);
+                 System.out.println("Thread " + this.pID + " in critical zone");
+                 try {
+                 this.sleep(this.timeToSleep);
+                 } catch (InterruptedException e) {
+                 e.printStackTrace();
+                 }
+                 System.out.println("Thread " + this.pID + " leaving critical zone after " + this.timeToSleep + "ms");
+                 setCriticalZone(false);
+                 this.wants = false;
+                 */
                 //Thread has accessed critical zone. Counter goes back to 0.
                 return new Pair<String, Integer>("" + this.pID, 0);
+
             }
             return threadAck;
         } else {
@@ -184,16 +188,31 @@ public class SDThread extends Thread {
         }
     }
 
-    public void useResource() {
+    public void useResource(List<Pair<String, Integer>> messageList) {
 
         setCriticalZone(true);
-
+        
+        String file  = "";
+        for (int i = 0; i < messageList.size(); i++) {
+            if (messageList.get(i).getmID() % TOTAL_ORDER_MULTIPLIER == pID) {
+                file = messageList.get(i).getMessage();
+            }
+        }
+        
         try {
-            System.out.println("Thread " + this.pID + " in critical zone");
+            System.out.println("Thread " + this.pID + " entering critical zone");
             Thread.sleep(this.timeToSleep);
-            System.out.println("Thread " + this.pID + " leaving critical zone after " + this.timeToSleep + "ms");
         } catch (InterruptedException ex) {
             Logger.getLogger(SDThread.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        
+        try {
+            PrintWriter writer = new PrintWriter(new FileWriter(file, true)); 
+            writer.println("Thread " + this.pID + " leaving critical zone after " + this.timeToSleep + "ms");
+            writer.close();
+            return;
+        } catch (Exception e) {
+            e.printStackTrace();
         }
 
         setCriticalZone(false);
@@ -216,20 +235,20 @@ public class SDThread extends Thread {
 
         //Create the packet to be used to receive data
         DatagramPacket packet = new DatagramPacket(data, 10000000);
-        
+
         //Name of the file that will be used as Resource
         String fileName = "output.txt";
-        
+
         while (true) {
 
             /*  If we have already sent and received every message we are done
-                Rationale: clientList - 1 ACKs per message +
-                clientList messages received from each thread (including itself)
-                In this implementation we simulate that all the Threads wants 
-                the Resource.
-            */        
-            if (messagesReceived == (totalMessagesToSend * (clientList.size() - 1)) +
-                    totalMessagesToSend * clientList.size()) {
+             Rationale: clientList - 1 ACKs per message +
+             clientList messages received from each thread (including itself)
+             In this implementation we simulate that all the Threads wants 
+             the Resource.
+             */
+            if (messagesReceived == (totalMessagesToSend * (clientList.size() - 1))
+                    + totalMessagesToSend * clientList.size()) {
                 clientList.get(pID).close();
                 return;
             }
@@ -249,7 +268,7 @@ public class SDThread extends Thread {
 
                         //If it is an ACK
                         if (m.getMessage().equals("ACK")) {
-                            threadAcks = ack(m, threadAcks);
+                            threadAcks = ack(m, threadAcks, messageList);
                         } else {
                             //If it is a USE message
                             messageList = receive(m, messageList);
@@ -290,7 +309,6 @@ public class SDThread extends Thread {
             }
         }
     }
-
 
     //Compare Messages for sorting
     public static Comparator<Pair<String, Integer>> mIDComparator = new Comparator<Pair<String, Integer>>() {
